@@ -26,15 +26,18 @@ const RGB buttonColors[4] = {red, green, yellow, blue};
 
 const byte ledPins[4] = {7,8,9,10};
 byte ledIndex = 0;
-//byte ledOut;
+byte ledLastIndex;
 
-const long millisDelay = 500;
+int millisDelay = 500;
 unsigned long millisNow;
 unsigned long millisLoop = 0;
 unsigned long buttonReset = 0;
-
+unsigned long loops = 0;
 
 byte buttonIndex;
+bool buttonPressed = false;
+int difficulty[4] = {200, 500, 300, 400}; //red, green, yellow, blue
+bool gameMode = false;
 byte randIndex;
 byte gameIndex = 0;
 char gameSeq[33];
@@ -74,21 +77,19 @@ void color(RGB rgb) {
 }
 
 void pinwheel() {
-  millisNow = millis();
-  
-  digitalWrite(ledPins[ledIndex], LOW);
-
-  if (millisNow - millisDelay >= millisLoop) {
-    millisLoop = millisNow;
+  if (millis() - millisDelay >= millisLoop) {
+    millisLoop = millis();
+    digitalWrite(ledPins[ledLastIndex], HIGH);
     color(buttonColors[ledIndex]);
-    digitalWrite(ledPins[ledIndex], HIGH);
-    if(digitalRead(ledPins[ledIndex]) == HIGH) {
-      // This line is inconsistent with led colors
-      // explore for loop
-      ledIndex = ((ledIndex + 1) % 4); // 0->1, 1->2, 2->3, 3->0
-    }
+    digitalWrite(ledPins[ledIndex], LOW);
+    ledLastIndex = ledIndex;
+    ledIndex = ((ledIndex + 1) % 4); // 0->1, 1->2, 2->3, 3->0
+    loops++;
   }
+
+  start();
 }
+
 void gameGen() {
   randIndex = random(0,4);
   gameSeq[gameIndex] = randIndex;
@@ -100,36 +101,71 @@ void gameGen() {
     digitalWrite(ledPins[gameSeq[i]], HIGH);  
     delay(millisDelay/2);
   }
-  delay(millisDelay);
+  //delay(millisDelay);
+  gamePlay(0);
   if (gameIndex < sizeof(gameSeq)) {
     gameIndex++;
   }
 }
 
-void playerIn() {
+void gameOver() {
+  color(buttonColors[0]);
+  for (int i = 0; i <= 3; i++) {
+    digitalWrite(ledPins[i], LOW);
+  }
+  delay(5000);
+  gameMode = false;
+}
+
+void gamePlay(int playSeq) {
+  millisLoop = millis();
+  while (millisLoop + millisDelay >= millis()) {
+    button();
+  }
+  if (buttonPressed && buttonIndex == gameSeq[playSeq]) {
+    if (gameIndex > playSeq) {
+      gamePlay(playSeq++);
+    }
+  } else {
+    gameOver();
+  }
+}
+
+void button() {
+  buttonPressed = false;
   for (int i=0; i<=3; i++) {
     if (digitalRead(i) == 1) {
       buttonIndex = i;
       buttonReset = millis();
-      digitalWrite(ledPins[buttonIndex], HIGH);
+      buttonPressed = true;
     }
   }
-  if (buttonReset + millisDelay >= millis()) {
+}
+
+void start() {
+  button();
+  if (buttonPressed && buttonReset + millisDelay >= millis()) {
     color(buttonColors[buttonIndex]);
-    digitalWrite(ledPins[buttonIndex], LOW);
+    for (int i = 0; i <= 3; i++) {
+      digitalWrite(ledPins[i], LOW);
+    }
+    delay(millisDelay);
+    for (int i = 0; i <= 3; i++) {
+      digitalWrite(ledPins[i], HIGH);
+    }
     buttonReset = 0;
-  } else {
-    digitalWrite(ledPins[buttonIndex], HIGH);
+    millisDelay = difficulty[buttonIndex];
+    gameMode = true;
   }
 }
 
 void loop() {
-
-
-  //playerIn();
-  //gameGen();
-  pinwheel();
-
+  if (!gameMode) {
+    pinwheel();
+    //start();
+  } else {
+    gameGen();
+  }
   //Serial.println(gameSeq);
 
 
