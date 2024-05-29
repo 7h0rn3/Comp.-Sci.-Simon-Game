@@ -40,11 +40,10 @@ int difficulty[4] = {200, 500, 300, 400}; //red, green, yellow, blue
 bool gameMode = false;
 byte randIndex;
 byte gameIndex = 0;
-char gameSeq[33];
+byte gameSeq[33];
 
 void setup() {
-  Serial.begin(9600);
-  pinMode(button1Pin, OUTPUT); //this should be INPUT or INPUT_PULLUP...
+  pinMode(button1Pin, OUTPUT);
   pinMode(button2Pin, OUTPUT);
   pinMode(button3Pin, OUTPUT);
   pinMode(button4Pin, OUTPUT);
@@ -86,7 +85,6 @@ void pinwheel() {
     ledIndex = ((ledIndex + 1) % 4); // 0->1, 1->2, 2->3, 3->0
     loops++;
   }
-
   start();
 }
 
@@ -101,8 +99,8 @@ void gameGen() {
     digitalWrite(ledPins[gameSeq[i]], HIGH);  
     delay(millisDelay/2);
   }
-  //delay(millisDelay);
-  gamePlay(0);
+  gamePlay();
+  delay(millisDelay);
   if (gameIndex < sizeof(gameSeq)) {
     gameIndex++;
   }
@@ -113,21 +111,32 @@ void gameOver() {
   for (int i = 0; i <= 3; i++) {
     digitalWrite(ledPins[i], LOW);
   }
-  delay(5000);
+  delay(millisDelay*2);
+  for (int i = 0; i <= 3; i++) {
+    digitalWrite(ledPins[i], HIGH);
+  }
   gameMode = false;
+  millisDelay = 500;
+  pinwheel();
 }
 
-void gamePlay(int playSeq) {
-  millisLoop = millis();
-  while (millisLoop + millisDelay >= millis()) {
-    button();
-  }
-  if (buttonPressed && buttonIndex == gameSeq[playSeq]) {
-    if (gameIndex > playSeq) {
-      gamePlay(playSeq++);
+void gamePlay() {
+  for (byte i=0; i<=gameIndex; i++) {
+    millisLoop = millis();
+    buttonPressed = false;
+    while (!buttonPressed) {
+      button();
     }
-  } else {
-    gameOver();
+    /*
+    while (millisLoop + millisDelay >= millis()) {
+      if (buttonPressed && buttonIndex == gameSeq[i]) {
+        continue;
+      }
+    }
+    */
+    if ((!buttonPressed && (millisLoop + millisDelay <= millis())) || buttonIndex != gameSeq[i]) {
+      gameOver();
+    }
   }
 }
 
@@ -140,11 +149,22 @@ void button() {
       buttonPressed = true;
     }
   }
+  if (buttonPressed) {
+    for (int i = 0; i <= 3; i++) {
+      digitalWrite(ledPins[i], HIGH);
+    }
+    while (digitalRead(buttonIndex)) {
+      color(buttonColors[buttonIndex]);
+      digitalWrite(ledPins[buttonIndex], LOW);
+    }
+    digitalWrite(ledPins[buttonIndex], HIGH);
+    delay(millisDelay);
+  }
 }
 
 void start() {
   button();
-  if (buttonPressed && buttonReset + millisDelay >= millis()) {
+  if (buttonPressed) {
     color(buttonColors[buttonIndex]);
     for (int i = 0; i <= 3; i++) {
       digitalWrite(ledPins[i], LOW);
@@ -162,12 +182,7 @@ void start() {
 void loop() {
   if (!gameMode) {
     pinwheel();
-    //start();
   } else {
     gameGen();
   }
-  //Serial.println(gameSeq);
-
-
-
 }
